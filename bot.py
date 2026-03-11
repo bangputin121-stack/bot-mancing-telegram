@@ -9,7 +9,7 @@ bot = telebot.TeleBot(TOKEN)
 
 # Daftar Ikan
 IKAN = [
-    "Ikan JEJE 🐟", "Ikan PUTIN 🐡", "Ikan RESA 🐠", 
+    "Ikan YEYE 🐟", "Ikan PUTIN 🐡", "Ikan RESA 🐠", 
     "Ikan MATCHA 🦈", "Ikan DONGKOL 🐳", "BUMIL-BUMIL 🦑",
     "Sepatu Bot Bekas 👞", "Kaleng Karatan 🥫", "Harta Karun! 💰"
 ]
