@@ -4,12 +4,11 @@ import time
 import os
 import json
 
-# Konfigurasi Token
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 bot = telebot.TeleBot(TOKEN)
 DB_FILE = "players.json"
 
-# --- DATA JORAN (RODS) ---
+# --- DATA JORAN & UMPAN (SAMA SEPERTI SEBELUMNYA) ---
 RODS = {
     "JORAN SPINNING": {"price": 50000, "luck": 1, "time": 10, "emoji": "🎣"},
     "JORAN BAITCASTING": {"price": 80000, "luck": 1.5, "time": 9, "emoji": "🎣"},
@@ -21,28 +20,19 @@ RODS = {
     "JORAN BERLIAN": {"price": 100000000, "luck": 100, "time": 2, "emoji": "💎"}
 }
 
-# --- DATA UMPAN (BAITS) ---
 BAITS = {
-    "UMPAN ULAT": {"price": 1000, "boost": 1.2, "emoji": "🐛", "desc": "Umpan dasar."},
-    "UMPAN KATAK": {"price": 5000, "boost": 2.5, "emoji": "🐸", "desc": "Sangat disukai ikan rawa."},
-    "UMPAN IKAN KECIL": {"price": 20000, "boost": 6.0, "emoji": "🐟", "desc": "Menarik ikan pemangsa."},
-    "UMPAN DAGING": {"price": 166000, "boost": 15.0, "emoji": "🥩", "desc": "Bau darah menarik monster laut!"}
+    "UMPAN ULAT": {"price": 1000, "boost": 1.2, "emoji": "🐛"},
+    "UMPAN KATAK": {"price": 5000, "boost": 2.5, "emoji": "🐸"},
+    "UMPAN IKAN KECIL": {"price": 20000, "boost": 6.0, "emoji": "🐟"},
+    "UMPAN DAGING": {"price": 166000, "boost": 15.0, "emoji": "🥩"}
 }
 
-# --- DATA IKAN (FISH) ---
 FISH_POOL = {
-    "COMMON": {
-        "Ikan Lele 🐟": 150, "Ikan Mujair 🐠": 200, "Ikan Mas 🐡": 250, "Sepatu Bot 👞": 0
-    },
-    "RARE": {
-        "Ikan Arwana Emas 🐉": 15000, "Ikan Pari 🌊": 20000, "Gurita Raksasa 🐙": 35000
-    },
-    "MYTHIC": {
-        "IKAN NAGA PURBA 🐲": 500000, "PUTRI DUYUNG 🧜‍♀️": 1500000, "KRAKEN MUDA 🦑": 5000000, "MEGALODON 🦈": 10000000
-    }
+    "COMMON": {"Ikan Lele 🐟": 150, "Ikan Mujair 🐠": 200, "Ikan Mas 🐡": 250, "Sepatu Bot 👞": 0},
+    "RARE": {"Arwana Emas 🐉": 15000, "Ikan Pari 🌊": 20000, "Gurita Raksasa 🐙": 35000},
+    "MYTHIC": {"NAGA PURBA 🐲": 500000, "PUTRI DUYUNG 🧜‍♀️": 1500000, "KRAKEN 🦑": 5000000, "MEGALODON 🦈": 10000000}
 }
 
-# --- DATABASE SYSTEM ---
 def load_data():
     if os.path.exists(DB_FILE):
         try:
@@ -53,138 +43,109 @@ def load_data():
 def save_data(data):
     with open(DB_FILE, "w") as f: json.dump(data, f)
 
-# --- COMMANDS ---
+# --- FUNGSI PENGECEKAN USER OTOMATIS ---
+def get_user_data(uid, name):
+    data = load_data()
+    if uid not in data:
+        data[uid] = {"name": name, "coin": 100000, "rod": "JORAN SPINNING", "bait": {}, "tas": {}}
+        save_data(data)
+    return data, data[uid]
+
 @bot.message_handler(commands=['start'])
 def start(message):
     uid = str(message.from_user.id)
-    data = load_data()
-    if uid not in data:
-        # Modal awal Rp 100.000
-        data[uid] = {"name": message.from_user.first_name, "coin": 100000, "rod": "JORAN SPINNING", "bait": {}, "tas": {}}
-    save_data(data)
-    bot.reply_to(message, "🌊 **SELAMAT DATANG DI MANCING RPG v2.0** 🌊\n\n/mancing - Mulai Mancing\n/shop - Toko Alat & Umpan\n/tas - Cek Inventaris\n/jual - Jual Hasil Tangkapan\n/profil - Cek Joran & Koin")
-
-@bot.message_handler(commands=['shop'])
-def shop(message):
-    txt = "🛒 **TOKO ALAT PANCING**\n"
-    for k, v in RODS.items():
-        txt += f"{v['emoji']} **{k}**\n💰 Rp {v['price']:,} | 🍀 Luck x{v['luck']} | ⏳ {v['time']}s\n"
-    
-    txt += "\n🐛 **TOKO UMPAN**\n"
-    for k, v in BAITS.items():
-        txt += f"{v['emoji']} **{k}**: Rp {v['price']:,} /biji\n"
-    
-    txt += "\n*Cara beli:* `/beli JORAN EMAS` atau `/beli UMPAN DAGING`"
-    bot.reply_to(message, txt, parse_mode="Markdown")
-
-@bot.message_handler(commands=['beli'])
-def buy(message):
-    uid = str(message.from_user.id)
-    data = load_data()
-    item_query = message.text.replace('/beli ', '').upper().strip()
-    
-    if item_query in RODS:
-        item = RODS[item_query]
-        if data[uid]['coin'] >= item['price']:
-            data[uid]['coin'] -= item['price']
-            data[uid]['rod'] = item_query
-            save_data(data)
-            bot.reply_to(message, f"✅ Berhasil membeli {item_query}!")
-        else: bot.reply_to(message, "❌ Koin tidak cukup!")
-        
-    elif item_query in BAITS:
-        item = BAITS[item_query]
-        if data[uid]['coin'] >= item['price']:
-            data[uid]['coin'] -= item['price']
-            data[uid]['bait'][item_query] = data[uid]['bait'].get(item_query, 0) + 1
-            save_data(data)
-            bot.reply_to(message, f"✅ Berhasil membeli 1 {item_query}!")
-        else: bot.reply_to(message, "❌ Koin tidak cukup!")
-    else:
-        bot.reply_to(message, "❓ Barang tidak ditemukan. Pastikan nama sesuai di /shop.")
+    get_user_data(uid, message.from_user.first_name)
+    bot.reply_to(message, "🌊 **MANCING RPG v2.1 READY!** 🌊\n\n/mancing - Mulai Mancing\n/shop - Toko\n/tas - Inventaris\n/jual - Jual Ikan\n/profil - Cek Status")
 
 @bot.message_handler(commands=['mancing'])
 def fish(message):
     uid = str(message.from_user.id)
-    data = load_data()
-    user = data.get(uid)
+    all_data, user = get_user_data(uid, message.from_user.first_name)
     
-    if not user['bait'] or sum(user['bait'].values()) == 0:
-        return bot.reply_to(message, "❌ Kamu tidak punya umpan! Beli dulu di /shop")
+    if not user.get('bait') or sum(user['bait'].values()) == 0:
+        return bot.reply_to(message, "❌ Kamu gak punya umpan! Beli dulu di /shop")
 
-    # Pakai umpan yang tersedia
     current_bait = list(user['bait'].keys())[0]
     user['bait'][current_bait] -= 1
     if user['bait'][current_bait] <= 0: del user['bait'][current_bait]
 
-    rod_info = RODS[user['rod']]
+    rod_info = RODS.get(user.get('rod', "JORAN SPINNING"), RODS["JORAN SPINNING"])
     wait_time = rod_info['time']
     
-    bot.send_message(message.chat.id, f"{rod_info['emoji']} **{user['rod']}** beraksi...\n{BAITS[current_bait]['emoji']} Menggunakan {current_bait}\n⏳ Menunggu {wait_time} detik...")
+    bot.send_message(message.chat.id, f"{rod_info['emoji']} **{user['rod']}** beraksi...\n⏳ Menunggu {wait_time} detik...")
     time.sleep(wait_time)
 
-    # Logika Luck
     total_luck = rod_info['luck'] * BAITS[current_bait]['boost']
     roll = random.random() * total_luck
 
-    # Syarat Ikan Mythic: Minimal Joran Fly Fishing + Hoki
     if roll > 80 and any(x in user['rod'] for x in ["FLY", "TELESKOPIK", "EMAS", "BERLIAN"]):
         fish_name = random.choice(list(FISH_POOL['MYTHIC'].keys()))
-        category = "MYTHIC 🌟"
     elif roll > 15:
         fish_name = random.choice(list(FISH_POOL['RARE'].keys()))
-        category = "RARE ✨"
     else:
         fish_name = random.choice(list(FISH_POOL['COMMON'].keys()))
-        category = "COMMON"
 
     user['tas'][fish_name] = user['tas'].get(fish_name, 0) + 1
-    save_data(data)
-    bot.reply_to(message, f"💥 **STRIKE!** 💥\n\nKamu mendapatkan: **{fish_name}**\nKategori: {category}\nUmpan sisa: {sum(user['bait'].values())}")
+    save_data(all_data)
+    bot.reply_to(message, f"💥 **STRIKE!**\nDapet: **{fish_name}**")
+
+@bot.message_handler(commands=['shop'])
+def shop(message):
+    txt = "🛒 **SHOP**\n"
+    for k, v in RODS.items(): txt += f"{v['emoji']} {k}: Rp{v['price']:,}\n"
+    txt += "\n🐛 **UMPAN**\n"
+    for k, v in BAITS.items(): txt += f"{v['emoji']} {k}: Rp{v['price']:,}\n"
+    bot.reply_to(message, txt)
+
+@bot.message_handler(commands=['beli'])
+def buy(message):
+    uid = str(message.from_user.id)
+    all_data, user = get_user_data(uid, message.from_user.first_name)
+    item_query = message.text.replace('/beli ', '').upper().strip()
+    
+    if item_query in RODS:
+        if user['coin'] >= RODS[item_query]['price']:
+            user['coin'] -= RODS[item_query]['price']
+            user['rod'] = item_query
+            save_data(all_data)
+            bot.reply_to(message, f"✅ Beli {item_query} sukses!")
+        else: bot.reply_to(message, "❌ Koin kurang!")
+    elif item_query in BAITS:
+        if user['coin'] >= BAITS[item_query]['price']:
+            user['coin'] -= BAITS[item_query]['price']
+            user['bait'][item_query] = user['bait'].get(item_query, 0) + 1
+            save_data(all_data)
+            bot.reply_to(message, f"✅ Beli 1 {item_query} sukses!")
+        else: bot.reply_to(message, "❌ Koin kurang!")
+    else: bot.reply_to(message, "❓ Barang gak ada.")
 
 @bot.message_handler(commands=['tas'])
 def bag(message):
     uid = str(message.from_user.id)
-    user = load_data().get(uid)
-    txt = "🎒 **INVENTARIS ANDA**\n\n🐟 **Hasil Tangkapan:**\n"
-    if not user['tas']: txt += "- Kosong\n"
-    for k, v in user['tas'].items(): txt += f"- {k}: {v} ekor\n"
-    
-    txt += "\n🐛 **Persediaan Umpan:**\n"
-    if not user['bait']: txt += "- Kosong\n"
-    for k, v in user['bait'].items(): txt += f"- {k}: {v} biji\n"
-    
-    bot.reply_to(message, txt, parse_mode="Markdown")
+    _, user = get_user_data(uid, message.from_user.first_name)
+    txt = "🎒 **TAS**\n\n🐟 **IKAN:**\n"
+    for k, v in user['tas'].items(): txt += f"- {k}: {v}\n"
+    txt += "\n🐛 **UMPAN:**\n"
+    for k, v in user['bait'].items(): txt += f"- {k}: {v}\n"
+    bot.reply_to(message, txt)
 
 @bot.message_handler(commands=['jual'])
 def sell(message):
     uid = str(message.from_user.id)
-    data = load_data()
-    user = data[uid]
-    if not user['tas']: return bot.reply_to(message, "Tidak ada ikan untuk dijual.")
-    
+    all_data, user = get_user_data(uid, message.from_user.first_name)
     total = 0
     for f, qty in user['tas'].items():
         price = FISH_POOL['COMMON'].get(f, 0) or FISH_POOL['RARE'].get(f, 0) or FISH_POOL['MYTHIC'].get(f, 0)
         total += price * qty
-        
     user['coin'] += total
     user['tas'] = {}
-    save_data(data)
-    bot.reply_to(message, f"💰 **PASAR IKAN**\n\nSemua ikan terjual seharga: **Rp {total:,}**\nTotal Koin: Rp {user['coin']:,}")
+    save_data(all_data)
+    bot.reply_to(message, f"💰 Terjual seharga Rp{total:,}!")
 
 @bot.message_handler(commands=['profil'])
 def profile(message):
     uid = str(message.from_user.id)
-    user = load_data().get(uid)
-    rod = RODS[user['rod']]
-    txt = (f"👤 **PROFIL PEMANCING**\n"
-           f"━━━━━━━━━━━━━━\n"
-           f"📛 Nama: {user['name']}\n"
-           f"💰 Koin: Rp {user['coin']:,}\n"
-           f"🎣 Joran: {user['rod']} {rod['emoji']}\n"
-           f"🍀 Luck Bonus: x{rod['luck']}\n"
-           f"⏳ Waktu Tunggu: {rod['time']} detik")
-    bot.reply_to(message, txt)
+    _, user = get_user_data(uid, message.from_user.first_name)
+    bot.reply_to(message, f"👤 **PROFIL**\n💰 Koin: Rp{user['coin']:,}\n🎣 Joran: {user['rod']}")
 
 bot.infinity_polling()
