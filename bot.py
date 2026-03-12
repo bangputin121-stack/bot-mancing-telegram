@@ -8,11 +8,6 @@ TOKEN = os.getenv('TELEGRAM_TOKEN')
 bot = telebot.TeleBot(TOKEN)
 DB_FILE = "players.json"
 
-import logging
-import asyncio
-from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-
 from config import BOT_TOKEN, GROUP_LINK, CHANNEL_LINK
 from database import Database
 from handlers.start import start_handler, register_handler
