@@ -8,144 +8,83 @@ TOKEN = os.getenv('TELEGRAM_TOKEN')
 bot = telebot.TeleBot(TOKEN)
 DB_FILE = "players.json"
 
-# --- DATA JORAN & UMPAN (SAMA SEPERTI SEBELUMNYA) ---
-RODS = {
-    "JORAN SPINNING": {"price": 50000, "luck": 1, "time": 10, "emoji": "🎣"},
-    "JORAN BAITCASTING": {"price": 80000, "luck": 1.5, "time": 9, "emoji": "🎣"},
-    "JORAN JIGGING": {"price": 120000, "luck": 2, "time": 8, "emoji": "🎣"},
-    "JORAN TROLLING": {"price": 500000, "luck": 3, "time": 7, "emoji": "🎣"},
-    "JORAN FLY FISHING": {"price": 1000000, "luck": 5, "time": 6, "emoji": "🛶"},
-    "JORAN TELESKOPIK": {"price": 10000000, "luck": 10, "time": 5, "emoji": "🔭"},
-    "JORAN EMAS": {"price": 20000000, "luck": 25, "time": 3, "emoji": "🔱"},
-    "JORAN BERLIAN": {"price": 100000000, "luck": 100, "time": 2, "emoji": "💎"}
-}
+import logging
+import asyncio
+from telegram import Update
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
 
-BAITS = {
-    "UMPAN ULAT": {"price": 1000, "boost": 1.2, "emoji": "🐛"},
-    "UMPAN KATAK": {"price": 5000, "boost": 2.5, "emoji": "🐸"},
-    "UMPAN IKAN KECIL": {"price": 20000, "boost": 6.0, "emoji": "🐟"},
-    "UMPAN DAGING": {"price": 166000, "boost": 15.0, "emoji": "🥩"}
-}
+from config import BOT_TOKEN, GROUP_LINK, CHANNEL_LINK
+from database import Database
+from handlers.start import start_handler, register_handler
+from handlers.profile import profile_handler
+from handlers.fishing import fishing_handler, fishing_callback
+from handlers.map import map_handler, map_callback
+from handlers.boost import boost_handler, boost_callback
+from handlers.bag import bag_handler
+from handlers.equipment import equipment_handler
+from handlers.upgrade import upgrade_handler, upgrade_callback
+from handlers.daily import daily_handler
+from handlers.history import history_handler
+from handlers.vip import vip_handler
+from handlers.shop import shop_handler, shop_callback
+from handlers.market import market_handler, market_callback
+from handlers.favorite import favorite_handler, favorite_callback
+from handlers.collection import collection_handler
+from handlers.transfer import transfer_handler, transfer_callback
+from handlers.topup import topup_handler
+from handlers.event import event_handler
+from handlers.leaderboard import leaderboard_handler
+from handlers.help import help_handler
 
-FISH_POOL = {
-    "COMMON": {"Ikan Lele 🐟": 150, "Ikan Mujair 🐠": 200, "Ikan Mas 🐡": 250, "Sepatu Bot 👞": 0},
-    "RARE": {"Arwana Emas 🐉": 15000, "Ikan Pari 🌊": 20000, "Gurita Raksasa 🐙": 35000},
-    "MYTHIC": {"NAGA PURBA 🐲": 500000, "PUTRI DUYUNG 🧜‍♀️": 1500000, "KRAKEN 🦑": 5000000, "MEGALODON 🦈": 10000000}
-}
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+logger = logging.getLogger(__name__)
 
-def load_data():
-    if os.path.exists(DB_FILE):
-        try:
-            with open(DB_FILE, "r") as f: return json.load(f)
-        except: return {}
-    return {}
+db = Database()
 
-def save_data(data):
-    with open(DB_FILE, "w") as f: json.dump(data, f)
+def main():
+    app = Application.builder().token(BOT_TOKEN).build()
 
-# --- FUNGSI PENGECEKAN USER OTOMATIS ---
-def get_user_data(uid, name):
-    data = load_data()
-    if uid not in data:
-        data[uid] = {"name": name, "coin": 100000, "rod": "JORAN SPINNING", "bait": {}, "tas": {}}
-        save_data(data)
-    return data, data[uid]
+    # Store db in bot_data
+    app.bot_data['db'] = db
 
-@bot.message_handler(commands=['start'])
-def start(message):
-    uid = str(message.from_user.id)
-    get_user_data(uid, message.from_user.first_name)
-    bot.reply_to(message, "🌊 **MANCING RPG v2.1 READY!** 🌊\n\n/mancing - Mulai Mancing\n/shop - Toko\n/tas - Inventaris\n/jual - Jual Ikan\n/profil - Cek Status")
+    # Command handlers
+    app.add_handler(CommandHandler("start", start_handler))
+    app.add_handler(CommandHandler("profil", profile_handler))
+    app.add_handler(CommandHandler("fishing", fishing_handler))
+    app.add_handler(CommandHandler("map", map_handler))
+    app.add_handler(CommandHandler("boost", boost_handler))
+    app.add_handler(CommandHandler("bag", bag_handler))
+    app.add_handler(CommandHandler("equipment", equipment_handler))
+    app.add_handler(CommandHandler("upgrade", upgrade_handler))
+    app.add_handler(CommandHandler("daily", daily_handler))
+    app.add_handler(CommandHandler("history", history_handler))
+    app.add_handler(CommandHandler("vip", vip_handler))
+    app.add_handler(CommandHandler("shop", shop_handler))
+    app.add_handler(CommandHandler("market", market_handler))
+    app.add_handler(CommandHandler("favorite", favorite_handler))
+    app.add_handler(CommandHandler("collection", collection_handler))
+    app.add_handler(CommandHandler("transfer", transfer_handler))
+    app.add_handler(CommandHandler("topup", topup_handler))
+    app.add_handler(CommandHandler("event", event_handler))
+    app.add_handler(CommandHandler("leaderboard", leaderboard_handler))
+    app.add_handler(CommandHandler("help", help_handler))
 
-@bot.message_handler(commands=['mancing'])
-def fish(message):
-    uid = str(message.from_user.id)
-    all_data, user = get_user_data(uid, message.from_user.first_name)
-    
-    if not user.get('bait') or sum(user['bait'].values()) == 0:
-        return bot.reply_to(message, "❌ Kamu gak punya umpan! Beli dulu di /shop")
+    # Callback query handlers
+    app.add_handler(CallbackQueryHandler(fishing_callback, pattern="^fish_"))
+    app.add_handler(CallbackQueryHandler(map_callback, pattern="^map_"))
+    app.add_handler(CallbackQueryHandler(boost_callback, pattern="^boost_"))
+    app.add_handler(CallbackQueryHandler(upgrade_callback, pattern="^upgrade_"))
+    app.add_handler(CallbackQueryHandler(shop_callback, pattern="^shop_"))
+    app.add_handler(CallbackQueryHandler(market_callback, pattern="^market_"))
+    app.add_handler(CallbackQueryHandler(favorite_callback, pattern="^fav_"))
+    app.add_handler(CallbackQueryHandler(transfer_callback, pattern="^transfer_"))
+    app.add_handler(CallbackQueryHandler(register_handler, pattern="^register$"))
 
-    current_bait = list(user['bait'].keys())[0]
-    user['bait'][current_bait] -= 1
-    if user['bait'][current_bait] <= 0: del user['bait'][current_bait]
+    logger.info("🎣 Fishing Bot started!")
+    app.run_polling(allowed_updates=Update.ALL_TYPES)
 
-    rod_info = RODS.get(user.get('rod', "JORAN SPINNING"), RODS["JORAN SPINNING"])
-    wait_time = rod_info['time']
-    
-    bot.send_message(message.chat.id, f"{rod_info['emoji']} **{user['rod']}** beraksi...\n⏳ Menunggu {wait_time} detik...")
-    time.sleep(wait_time)
-
-    total_luck = rod_info['luck'] * BAITS[current_bait]['boost']
-    roll = random.random() * total_luck
-
-    if roll > 80 and any(x in user['rod'] for x in ["FLY", "TELESKOPIK", "EMAS", "BERLIAN"]):
-        fish_name = random.choice(list(FISH_POOL['MYTHIC'].keys()))
-    elif roll > 15:
-        fish_name = random.choice(list(FISH_POOL['RARE'].keys()))
-    else:
-        fish_name = random.choice(list(FISH_POOL['COMMON'].keys()))
-
-    user['tas'][fish_name] = user['tas'].get(fish_name, 0) + 1
-    save_data(all_data)
-    bot.reply_to(message, f"💥 **STRIKE!**\nDapet: **{fish_name}**")
-
-@bot.message_handler(commands=['shop'])
-def shop(message):
-    txt = "🛒 **SHOP**\n"
-    for k, v in RODS.items(): txt += f"{v['emoji']} {k}: Rp{v['price']:,}\n"
-    txt += "\n🐛 **UMPAN**\n"
-    for k, v in BAITS.items(): txt += f"{v['emoji']} {k}: Rp{v['price']:,}\n"
-    bot.reply_to(message, txt)
-
-@bot.message_handler(commands=['beli'])
-def buy(message):
-    uid = str(message.from_user.id)
-    all_data, user = get_user_data(uid, message.from_user.first_name)
-    item_query = message.text.replace('/beli ', '').upper().strip()
-    
-    if item_query in RODS:
-        if user['coin'] >= RODS[item_query]['price']:
-            user['coin'] -= RODS[item_query]['price']
-            user['rod'] = item_query
-            save_data(all_data)
-            bot.reply_to(message, f"✅ Beli {item_query} sukses!")
-        else: bot.reply_to(message, "❌ Koin kurang!")
-    elif item_query in BAITS:
-        if user['coin'] >= BAITS[item_query]['price']:
-            user['coin'] -= BAITS[item_query]['price']
-            user['bait'][item_query] = user['bait'].get(item_query, 0) + 1
-            save_data(all_data)
-            bot.reply_to(message, f"✅ Beli 1 {item_query} sukses!")
-        else: bot.reply_to(message, "❌ Koin kurang!")
-    else: bot.reply_to(message, "❓ Barang gak ada.")
-
-@bot.message_handler(commands=['tas'])
-def bag(message):
-    uid = str(message.from_user.id)
-    _, user = get_user_data(uid, message.from_user.first_name)
-    txt = "🎒 **TAS**\n\n🐟 **IKAN:**\n"
-    for k, v in user['tas'].items(): txt += f"- {k}: {v}\n"
-    txt += "\n🐛 **UMPAN:**\n"
-    for k, v in user['bait'].items(): txt += f"- {k}: {v}\n"
-    bot.reply_to(message, txt)
-
-@bot.message_handler(commands=['jual'])
-def sell(message):
-    uid = str(message.from_user.id)
-    all_data, user = get_user_data(uid, message.from_user.first_name)
-    total = 0
-    for f, qty in user['tas'].items():
-        price = FISH_POOL['COMMON'].get(f, 0) or FISH_POOL['RARE'].get(f, 0) or FISH_POOL['MYTHIC'].get(f, 0)
-        total += price * qty
-    user['coin'] += total
-    user['tas'] = {}
-    save_data(all_data)
-    bot.reply_to(message, f"💰 Terjual seharga Rp{total:,}!")
-
-@bot.message_handler(commands=['profil'])
-def profile(message):
-    uid = str(message.from_user.id)
-    _, user = get_user_data(uid, message.from_user.first_name)
-    bot.reply_to(message, f"👤 **PROFIL**\n💰 Koin: Rp{user['coin']:,}\n🎣 Joran: {user['rod']}")
-
-bot.infinity_polling()
+if __name__ == '__main__':
+    main()
